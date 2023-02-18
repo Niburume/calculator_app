@@ -9,15 +9,6 @@ import 'models/settings_provider.dart';
 void main() {
   ColorTheme theme;
   runApp(
-    // MultiProvider(
-    //   providers: [
-    //     Provider<Something>(create: (_) => Something()),
-    //     Provider<SomethingElse>(create: (_) => SomethingElse()),
-    //     Provider<AnotherThing>(create: (_) => AnotherThing()),
-    //   ],
-    //   child: someWidget,
-    // )
-
     MultiProvider(
       providers: [
         ChangeNotifierProvider<SettingsProvider>(
