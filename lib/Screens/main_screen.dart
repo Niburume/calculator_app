@@ -505,119 +505,107 @@ class _CalculatorAppState extends State<CalculatorApp>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Column(
-                // mainAxisAlignment: MainAxisAlignment.start,
-                // crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  SizedBox(
-                    height: 250,
-                    child: ListView.builder(
-                      controller: _resultsController,
-                      itemCount: sessionModels.length,
-                      reverse: true,
-                      // shrinkWrap: false,
-                      itemBuilder: (BuildContext context, int sessionIndex) {
-                        print(_resultsController.position.pixels);
-                        var sessionId = sessionModels[sessionIndex].id;
+            Expanded(
+              child: ListView(shrinkWrap: true, reverse: true, children: [
+                ListView.builder(
+                  controller: _resultsController,
+                  itemCount: sessionModels.length,
+                  reverse: true,
+                  shrinkWrap: true,
+                  physics: ScrollPhysics(),
+                  itemBuilder: (BuildContext context, int sessionIndex) {
+                    var sessionId = sessionModels[sessionIndex].id;
 
-                        return Column(
+                    return Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    _scaleDialog(sessionId, null, true);
-                                  },
-                                  child: SizedBox(
-                                    width: (widthOfScreen - 30) * 0.60,
-                                    child: FittedBox(
-                                      fit: BoxFit.fill,
-                                      child: Text(
-                                        '${sessionModels[sessionIndex].sessionName}',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: theme.historyText,
-                                            fontFamily: 'ShareTech'),
-                                      ),
-                                    ),
+                            GestureDetector(
+                              onTap: () {
+                                _scaleDialog(sessionId, null, true);
+                              },
+                              child: SizedBox(
+                                width: (widthOfScreen - 30) * 0.60,
+                                child: FittedBox(
+                                  fit: BoxFit.fill,
+                                  child: Text(
+                                    '${sessionModels[sessionIndex].sessionName}',
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        color: theme.historyText,
+                                        fontFamily: 'ShareTech'),
                                   ),
                                 ),
-                                SizedBox(
-                                  width: (widthOfScreen - 30) * 0.30,
-                                  child: FittedBox(
-                                    fit: BoxFit.fill,
-                                    child: Text(
-                                      DateFormat('yyyy/MM/dd HH:mm')
-                                          .format(sessionModels[sessionIndex]
-                                              .dateStamp)
-                                          .toString(),
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: theme.historyText,
-                                          fontFamily: 'ShareTech'),
-                                    ),
-                                  ),
-                                )
-                              ],
+                              ),
                             ),
-                            const Divider(),
-                            Container(
-                              child: ListView.builder(
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  shrinkWrap: true,
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  reverse: true,
-                                  itemCount: sessionModels[sessionIndex]
-                                      .resultsId
-                                      .length,
-                                  itemBuilder: (context, index) {
-                                    var i = sessionModels[sessionIndex]
-                                            .resultsId
-                                            .length -
-                                        index -
-                                        1;
-                                    List<ResultModel> currentResult =
-                                        calcResults[sessionId]!.toList();
-                                    return ResultTile(
-                                      sessionId: sessionId,
-                                      expressionId: currentResult[i].id,
-                                      name: currentResult[i].name == null
-                                          ? '...'
-                                          : currentResult[i].name!,
-                                      expression:
-                                          currentResult[i].expression ?? '',
-                                      result: currentResult[i]
-                                              .result
-                                              .toStringAsFixed(decimals) ??
-                                          '',
-                                      textSize: textFieldFontSize * 0.4,
-                                      backgroundColor: theme.background,
-                                      resultTextColor: theme.historyText,
-                                      onResultTap: onResultTap,
-                                      nameTextColor:
-                                          currentResult[i].name == null
-                                              ? theme.resultText
-                                              : null,
-                                      onNameTap: _scaleDialog,
-                                    );
-                                  }),
+                            SizedBox(
+                              width: (widthOfScreen - 30) * 0.30,
+                              child: FittedBox(
+                                fit: BoxFit.fill,
+                                child: Text(
+                                  DateFormat('yyyy/MM/dd HH:mm')
+                                      .format(
+                                          sessionModels[sessionIndex].dateStamp)
+                                      .toString(),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color: theme.historyText,
+                                      fontFamily: 'ShareTech'),
+                                ),
+                              ),
                             )
                           ],
-                        );
-                      },
-                    ),
-                  ),
-                  // endregion
-
-                  // region TOTAL field
-
-                  // endregion
-                  const Divider(
-                    height: 1,
-                    thickness: 2,
-                  )
-                ]),
+                        ),
+                        const Divider(
+                          height: 1,
+                          thickness: 2,
+                        ),
+                        // const Divider(),
+                        Container(
+                          child: ListView.builder(
+                              physics: const NeverScrollableScrollPhysics(),
+                              shrinkWrap: true,
+                              padding: const EdgeInsets.only(bottom: 10),
+                              reverse: true,
+                              itemCount:
+                                  sessionModels[sessionIndex].resultsId.length,
+                              itemBuilder: (context, index) {
+                                var i = sessionModels[sessionIndex]
+                                        .resultsId
+                                        .length -
+                                    index -
+                                    1;
+                                List<ResultModel> currentResult =
+                                    calcResults[sessionId]!.toList();
+                                return ResultTile(
+                                  sessionId: sessionId,
+                                  expressionId: currentResult[i].id,
+                                  name: currentResult[i].name == null
+                                      ? '...'
+                                      : currentResult[i].name!,
+                                  expression: currentResult[i].expression ?? '',
+                                  result: currentResult[i]
+                                          .result
+                                          .toStringAsFixed(decimals) ??
+                                      '',
+                                  textSize: textFieldFontSize * 0.4,
+                                  backgroundColor: theme.background,
+                                  resultTextColor: theme.historyText,
+                                  onResultTap: onResultTap,
+                                  nameTextColor: currentResult[i].name == null
+                                      ? theme.resultText
+                                      : null,
+                                  onNameTap: _scaleDialog,
+                                );
+                              }),
+                        )
+                      ],
+                    );
+                  },
+                ),
+              ]),
+            ),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
