@@ -1,13 +1,14 @@
 import 'package:flutter/cupertino.dart';
 
 class ResultModel {
-  String id;
+  final String id;
   String? name;
   String expression;
   double result;
-  DateTime dateStamp;
+  final DateTime dateStamp;
   String? address;
   String? note;
+  String sessionId;
 
   ResultModel(
       {required this.id,
@@ -16,24 +17,56 @@ class ResultModel {
       required this.result,
       required this.dateStamp,
       this.address,
-      this.note});
+      this.note,
+      required this.sessionId});
+}
 
-  // ResultModel model =
-  //     ResultModel(id: '123', expression: '3+4+5+6', result: '35');
+class SessionModel {
+  String id;
+  String? sessionName;
+  List<String> resultsId;
+  final DateTime dateStamp;
 
+  SessionModel(
+      {required this.id,
+      required this.dateStamp,
+      this.sessionName,
+      required this.resultsId});
 }
 
 class Results extends ChangeNotifier {
-  List<ResultModel> get resultModels {
-    return [..._dummyModels];
+  final Map<String, List<ResultModel>> _sessionsExpressions = {};
+  final List<SessionModel> _sessions = [];
+
+  List<SessionModel> get sessionModels {
+    return [..._sessions];
   }
 
-  void addResult(ResultModel result) {
-    _dummyModels.add(result);
+  Map<String, List<ResultModel>> get expressions {
+    return _sessionsExpressions;
   }
 
-  void changeNameById(String id, String name) {
-    resultModels.forEach((element) {
+  void addResult(String sessionId, ResultModel result) {
+    if (!_sessionsExpressions.containsKey(sessionId)) {
+      _sessionsExpressions[sessionId] = [];
+    }
+    _sessionsExpressions[sessionId]!.add(result);
+    _sessions.forEach((element) {
+      if (element.id == sessionId) {
+        element.resultsId.add(result.id);
+        return;
+      }
+    });
+
+    notifyListeners();
+  }
+
+  List<ResultModel> getResultsModelsBySessionId(String sessionId) {
+    return expressions[sessionId]!;
+  }
+
+  void changeExpressionNameById(String sessionId, String id, String name) {
+    expressions[sessionId]?.forEach((element) {
       if (element.id == id) {
         element.name = name;
         return;
@@ -42,8 +75,8 @@ class Results extends ChangeNotifier {
     });
   }
 
-  changeNoteById(String id, String note) {
-    resultModels.forEach((element) {
+  changeNoteById(String sessionId, String id, String note) {
+    expressions[sessionId]?.forEach((element) {
       if (element.id == id) {
         element.note = note;
         return;
@@ -52,10 +85,50 @@ class Results extends ChangeNotifier {
     });
   }
 
-  ResultModel fetchResultModelById(String id) {
-    print(resultModels[0].id);
-    return resultModels.firstWhere((element) => element.id == id);
+  ResultModel? fetchResultModelById(String sessionId, String id) {
+    return expressions[sessionId]?.firstWhere((element) => element.id == id);
   }
-}
 
-final List<ResultModel> _dummyModels = [];
+// Sessions
+  String createSession() {
+    String sessionId = DateTime.now().toString();
+    _sessions.insert(
+        0,
+        SessionModel(
+            dateStamp: DateTime.now(),
+            id: sessionId,
+            sessionName: sessionId,
+            resultsId: []));
+    return sessionId;
+  }
+
+  void updateSessionName(String id, String name) {
+    _sessions.forEach((element) {
+      if (element.id == id) {
+        element.sessionName = name;
+        return;
+      }
+    });
+    notifyListeners();
+  }
+
+  String fetchSessionNameById(id) {
+    SessionModel? session = _sessions.firstWhere((element) => element.id == id);
+    if (session != null) {
+      return session.sessionName!;
+    } else {
+      return 'No name';
+    }
+  }
+
+  // void addResult(String sessionId, String resultId) {
+  //   _sessions.forEach((element) {
+  //     print('session id is: ${element.id}');
+  //     if (element.id == sessionId) {
+  //       element.resultsId?.add(resultId);
+  //     }
+  //   });
+  //
+  //   notifyListeners();
+  // }
+}
