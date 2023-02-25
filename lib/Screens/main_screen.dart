@@ -16,6 +16,7 @@ import '../models/result_model.dart';
 import '../models/settings_provider.dart';
 
 import '../widgets/dialog_screen_tile.dart';
+import '../widgets/dialogs.dart';
 import '../widgets/resultTile.dart';
 
 class CalculatorApp extends StatefulWidget {
@@ -33,7 +34,9 @@ class _CalculatorAppState extends State<CalculatorApp>
   bool wheelIsSelected = false;
   double referenceDx = 0;
   double widthOfScreen = 0;
+  double heightOfScreen = 0;
   double buttonSize = 0;
+  double appBarHeight = 35;
   String resultString = '';
   double resultDouble = 0.0;
 
@@ -308,8 +311,15 @@ class _CalculatorAppState extends State<CalculatorApp>
       resultString = resultPlaceHolder;
     }
   }
-// endregion
 
+// endregion
+  // region removeZeros
+  String removeZeros(double value) {
+    RegExp regex = RegExp(r'([.]*0)(?!.*\d)');
+    return value.toStringAsFixed(decimals).replaceAll(regex, '');
+  }
+
+// endregion
   // region MOVE CURSOR
   void moveCursor(double newPositionX) {
     int textLength = _textEditingController.text.length;
@@ -346,184 +356,21 @@ class _CalculatorAppState extends State<CalculatorApp>
     setState(() {});
   }
 
-  void onNameTap(String id) {
-    bool isNameNull = false;
-    final TextEditingController nameControllerTextField =
-        TextEditingController();
-    final TextEditingController noteControllerTextField =
-        TextEditingController();
-    final theme =
-        Provider.of<SettingsProvider>(context, listen: false).providerTheme;
-    final resultModel = Provider.of<Results>(context, listen: false)
-        .fetchResultModelById(currentSessionId!, id);
-    isNameNull = resultModel?.name == null ? true : false;
-
-    // region SHOW DIALOG
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Dialog(
-            backgroundColor: theme.background,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.0)), //this right here
-            child: SingleChildScrollView(
-              child: Container(
-                constraints: const BoxConstraints(maxHeight: 400),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      DialogTile(
-                        label: 'Date:',
-                        value: DateFormat.yMd()
-                            .add_jm()
-                            .format(resultModel!.dateStamp)
-                            .toString(),
-                        labelColor: theme.historyText,
-                        valueColor: theme.resultText,
-                      ),
-                      DialogTile(
-                        label: 'Adress:',
-                        value: 'Lillhagsvägen 8, 124 71 Bandhagen',
-                        labelColor: theme.historyText,
-                        valueColor: theme.resultText,
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Text(
-                            'Name: ',
-                            style: TextStyle(color: theme.historyText),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              style: TextStyle(color: theme.resultText),
-                              controller: nameControllerTextField,
-                              textAlign: TextAlign.end,
-                              decoration: InputDecoration(
-                                  hintStyle: TextStyle(
-                                      color: resultModel.name == null
-                                          ? theme.historyText
-                                          : theme.resultText),
-                                  border: InputBorder.none,
-                                  hintText: resultModel.name ??
-                                      'type a name here...'),
-                            ),
-                          )
-                        ],
-                      ),
-                      const Divider(
-                        thickness: 1,
-                      ),
-                      DialogTile(
-                        label: 'Expression:',
-                        value: resultModel.expression,
-                        labelColor: theme.historyText,
-                        valueColor: theme.resultText,
-                      ),
-                      DialogTile(
-                        label: 'RESULT:',
-                        value: resultModel.result.toString(),
-                        labelColor: theme.historyText,
-                        valueColor: theme.resultText,
-                      ),
-                      Container(
-                        padding: EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: theme.historyText,
-                          border: Border.all(color: theme.historyText),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: SingleChildScrollView(
-                          child: TextField(
-                            style: TextStyle(color: theme.resultText),
-                            maxLines: 3,
-                            controller: noteControllerTextField,
-                            decoration: InputDecoration(
-                                hintStyle: TextStyle(
-                                    color: resultModel.note == null
-                                        ? theme.historyText
-                                        : theme.resultText),
-                                border: InputBorder.none,
-                                hintText:
-                                    resultModel.note ?? 'type a note here...'),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                foregroundColor: theme.resultText,
-                                backgroundColor:
-                                    theme.clearButton, // foreground
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              child: Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(
-                            width: 10,
-                          ),
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                foregroundColor: theme.resultText,
-                                backgroundColor:
-                                    theme.operationButton, // foreground
-                              ),
-                              onPressed: () {
-                                if (nameControllerTextField.text.isNotEmpty) {
-                                  Provider.of<Results>(context, listen: false)
-                                      .changeExpressionNameById(
-                                          currentSessionId!,
-                                          resultModel.id,
-                                          nameControllerTextField.text);
-                                }
-                                if (noteControllerTextField.text.isNotEmpty) {
-                                  if (noteControllerTextField.text.isNotEmpty) {
-                                    Provider.of<Results>(context, listen: false)
-                                        .changeNoteById(
-                                            currentSessionId!,
-                                            resultModel.id,
-                                            noteControllerTextField.text);
-                                  }
-                                }
-                                setState(() {
-                                  Navigator.pop(context);
-                                });
-                              },
-                              child: Text('Save'),
-                            ),
-                          )
-                        ],
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        });
-    print('nameTapped');
-    // endregion
-  }
-
-  String removeZeros(double value) {
-    RegExp regex = RegExp(r'([.]*0)(?!.*\d)');
-    return value.toStringAsFixed(decimals).replaceAll(regex, '');
-  }
+  // void onNameTap(String id) {
+  //   // region SHOW DIALOG
+  //   print('nameTapped');
+  //   // endregion
+  // }
 
   // endregion
 
   // region Dialog Function
-  void _scaleDialog(String id) {
+  void updateUI() {
+    setState(() {});
+  }
+
+  void _scaleDialog(
+      String currentSessionId, String? expressionId, bool isSession) {
     showGeneralDialog(
       context: context,
       pageBuilder: (ctx, a1, a2) {
@@ -533,89 +380,25 @@ class _CalculatorAppState extends State<CalculatorApp>
         var curve = Curves.easeInOut.transform(a1.value);
         return Transform.scale(
           scale: curve,
-          child: _dialog(ctx, id),
+          child: RenameDialog(
+              context: context,
+              isSession: isSession,
+              currentSessionId: currentSessionId,
+              expressionId: expressionId,
+              callback: updateUI),
         );
       },
-      transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 250),
     );
   }
 
-  Widget _dialog(BuildContext context, String id) {
-    final TextEditingController renameAddressController =
-        TextEditingController();
-    final theme =
-        Provider.of<SettingsProvider>(context, listen: false).providerTheme;
-
-    return AlertDialog(
-      title: const Text("Rename..."),
-      content: SingleChildScrollView(
-        child: TextField(
-          style: TextStyle(color: theme.resultText),
-          maxLines: 3,
-          controller: renameAddressController,
-          decoration: InputDecoration(
-            hintStyle: TextStyle(color: theme.resultText),
-            border: InputBorder.none,
-            hintText: Provider.of<Results>(context, listen: false)
-                .fetchSessionNameById(id),
-            //     .sessionName
-          ),
-        ),
-      ),
-      actions: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: theme.resultText,
-                  backgroundColor: theme.clearButton, // foreground
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: Text('Cancel'),
-              ),
-            ),
-            const SizedBox(
-              width: 10,
-            ),
-            Expanded(
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  foregroundColor: theme.resultText,
-                  backgroundColor: theme.operationButton, // foreground
-                ),
-                onPressed: () {
-                  Provider.of<Results>(context, listen: false)
-                      .updateSessionName(id, renameAddressController.text);
-                  setState(() {
-                    Navigator.pop(context);
-                  });
-                },
-                child: Text('Save'),
-              ),
-            )
-          ],
-        )
-        // TextButton(
-        //     onPressed: () {
-        //
-        //     },
-        //     child: const Text(
-        //       "Okay",
-        //       style: TextStyle(color: Colors.red, fontSize: 17),
-        //     ))
-      ],
-    );
-  }
   // endregion
 
   @override
   void didChangeDependencies() {
     setState(() {
       widthOfScreen = MediaQuery.of(context).size.width;
+      heightOfScreen = MediaQuery.of(context).size.height;
       buttonSize = (widthOfScreen - 15 * 2) / 4;
       textFieldFontSize = buttonSize / 2.5;
     });
@@ -683,7 +466,7 @@ class _CalculatorAppState extends State<CalculatorApp>
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(35.0),
+        preferredSize: Size.fromHeight(appBarHeight),
         child: AppBar(
           title: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 200),
@@ -744,30 +527,37 @@ class _CalculatorAppState extends State<CalculatorApp>
                               children: [
                                 GestureDetector(
                                   onTap: () {
-                                    _scaleDialog(
-                                        sessionModels[sessionIndex].id);
+                                    _scaleDialog(sessionId, null, true);
                                   },
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
+                                  child: SizedBox(
+                                    width: (widthOfScreen - 30) * 0.60,
+                                    child: FittedBox(
+                                      fit: BoxFit.fill,
+                                      child: Text(
+                                        '${sessionModels[sessionIndex].sessionName}',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: theme.historyText,
+                                            fontFamily: 'ShareTech'),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: (widthOfScreen - 30) * 0.30,
+                                  child: FittedBox(
+                                    fit: BoxFit.fill,
                                     child: Text(
-                                      '${sessionModels[sessionIndex].sessionName}',
+                                      DateFormat('yyyy/MM/dd HH:mm')
+                                          .format(sessionModels[sessionIndex]
+                                              .dateStamp)
+                                          .toString(),
                                       style: TextStyle(
                                           fontSize: 12,
                                           color: theme.historyText,
                                           fontFamily: 'ShareTech'),
                                     ),
                                   ),
-                                ),
-                                Text(
-                                  DateFormat.yMd()
-                                      .add_jm()
-                                      .format(
-                                          sessionModels[sessionIndex].dateStamp)
-                                      .toString(),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: theme.historyText,
-                                      fontFamily: 'ShareTech'),
                                 )
                               ],
                             ),
@@ -790,7 +580,8 @@ class _CalculatorAppState extends State<CalculatorApp>
                                     List<ResultModel> currentResult =
                                         calcResults[sessionId]!.toList();
                                     return ResultTile(
-                                      id: currentResult[i].id,
+                                      sessionId: sessionId,
+                                      expressionId: currentResult[i].id,
                                       name: currentResult[i].name == null
                                           ? '...'
                                           : currentResult[i].name!,
@@ -808,7 +599,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                                           currentResult[i].name == null
                                               ? theme.resultText
                                               : null,
-                                      onNameTap: onNameTap,
+                                      onNameTap: _scaleDialog,
                                     );
                                   }),
                             )
@@ -1150,98 +941,3 @@ class _CalculatorAppState extends State<CalculatorApp>
   /// are denied the `Future` will return an error.
 
 }
-
-// Column(
-//     mainAxisAlignment: MainAxisAlignment.end,
-//     crossAxisAlignment: CrossAxisAlignment.end,
-//     children: [
-//       ListView.builder(
-//         // controller: _resultsController,
-//         itemCount: sessionModels.length,
-//         reverse: true,
-//         // shrinkWrap: false,
-//         itemBuilder: (BuildContext context, int sessionIndex) {
-//           var sessionId = sessionModels[sessionIndex].id;
-//           return Column(
-//             children: [
-//               Row(
-//                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//                 children: [
-//                   SingleChildScrollView(
-//                     scrollDirection: Axis.horizontal,
-//                     child: Text(
-//                       '${sessionModels[sessionIndex].sessionName}',
-//                       style: TextStyle(
-//                           fontSize: 12,
-//                           color: theme.historyText,
-//                           fontFamily: 'ShareTech'),
-//                     ),
-//                   ),
-//                   Text(
-//                     DateFormat.yMd()
-//                         .add_jm()
-//                         .format(
-//                             sessionModels[sessionIndex].dateStamp)
-//                         .toString(),
-//                     style: TextStyle(
-//                         fontSize: 12,
-//                         color: theme.historyText,
-//                         fontFamily: 'ShareTech'),
-//                   )
-//                 ],
-//               ),
-//               const Divider(),
-//               Container(
-//                 child: ListView.builder(
-//                     physics: const NeverScrollableScrollPhysics(),
-//                     shrinkWrap: true,
-//                     padding: const EdgeInsets.only(bottom: 10),
-//                     reverse: true,
-//                     itemCount: sessionModels[sessionIndex]
-//                         .resultsId
-//                         .length,
-//                     itemBuilder: (context, index) {
-//                       var i = sessionModels[sessionIndex]
-//                               .resultsId
-//                               .length -
-//                           index -
-//                           1;
-//                       List<ResultModel> currentResult =
-//                           calcResults[sessionId]!.toList();
-//                       return ResultTile(
-//                         id: currentResult[i].id,
-//                         name: currentResult[i].name == null
-//                             ? '...'
-//                             : currentResult[i].name!,
-//                         expression:
-//                             currentResult[i].expression ?? '',
-//                         result: currentResult[i]
-//                                 .result
-//                                 .toStringAsFixed(decimals) ??
-//                             '',
-//                         textSize: textFieldFontSize * 0.4,
-//                         backgroundColor: theme.background,
-//                         resultTextColor: theme.historyText,
-//                         onResultTap: onResultTap,
-//                         nameTextColor:
-//                             currentResult[i].name == null
-//                                 ? theme.resultText
-//                                 : null,
-//                         onNameTap: onNameTap,
-//                       );
-//                     }),
-//               )
-//             ],
-//           );
-//         },
-//       ),
-//       // endregion
-//
-//       // region TOTAL field
-//
-//       // endregion
-//       const Divider(
-//         height: 1,
-//         thickness: 2,
-//       )
-//     ]),

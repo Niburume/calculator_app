@@ -121,6 +121,10 @@ class Results extends ChangeNotifier {
     }
   }
 
+  SessionModel fetchSessionModelById(id) {
+    return _sessions.firstWhere((element) => element.id == id);
+  }
+
   // void addResult(String sessionId, String resultId) {
   //   _sessions.forEach((element) {
   //     print('session id is: ${element.id}');

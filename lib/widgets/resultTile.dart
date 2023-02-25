@@ -3,7 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 class ResultTile extends StatelessWidget {
   final String name;
-  final String id;
+  final String sessionId;
+  final String expressionId;
   final String expression;
   final String result;
   final double textSize;
@@ -11,10 +12,12 @@ class ResultTile extends StatelessWidget {
   final Color resultTextColor;
   final Color? nameTextColor;
   final void Function(String result) onResultTap;
-  final void Function(String id) onNameTap;
+  final void Function(String sessionId, String? expressionId, bool isSession)
+      onNameTap;
 
   ResultTile(
       {required this.name,
+      required this.sessionId,
       required this.expression,
       required this.result,
       required this.textSize,
@@ -23,10 +26,11 @@ class ResultTile extends StatelessWidget {
       required this.onResultTap,
       this.nameTextColor,
       required this.onNameTap,
-      required this.id});
+      required this.expressionId});
 
   @override
   Widget build(BuildContext context) {
+    print('expressionId: $expressionId');
     TextStyle textStyle = GoogleFonts.saira(
         fontSize: textSize, color: nameTextColor, fontWeight: FontWeight.w500);
     return Row(
@@ -35,7 +39,7 @@ class ResultTile extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         GestureDetector(
-          onTap: () => onNameTap(id),
+          onTap: () => onNameTap(sessionId, expressionId, false),
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: 10),
             child: Text(name,
