@@ -2,25 +2,24 @@ import 'dart:async';
 
 import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:calculator_app/Screens/settings_screen.dart';
+import 'package:calculator_app/helpers/db_helper.dart';
 import 'package:calculator_app/widgets/controlBarButton.dart';
 import 'package:calculator_app/widgets/number_button.dart';
 import 'package:flutter/material.dart';
 import 'package:function_tree/function_tree.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../models/result_model.dart';
+import '../helpers/geolocation.dart';
+import '../models/models.dart';
 import '../models/settings_provider.dart';
 
-import '../widgets/dialog_screen_tile.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/resultTile.dart';
 
 class CalculatorApp extends StatefulWidget {
-  CalculatorApp({Key? key}) : super(key: key);
+  const CalculatorApp({Key? key}) : super(key: key);
 
   @override
   State<CalculatorApp> createState() => _CalculatorAppState();
@@ -29,6 +28,7 @@ class CalculatorApp extends StatefulWidget {
 class _CalculatorAppState extends State<CalculatorApp>
     with WidgetsBindingObserver {
   // region Initials
+  GeoLocation geoLocation = GeoLocation();
   int cursorPosition = 0;
   double textFieldFontSize = 0;
   bool wheelIsSelected = false;
@@ -40,12 +40,15 @@ class _CalculatorAppState extends State<CalculatorApp>
   String resultString = '';
   double resultDouble = 0.0;
 
-  late Results results;
+  List<SessionModel> _listOfSessions = [];
+  Map<int, List<ResultModel>?> _resultsBySessionId = {};
+
   bool totalIsWrong = false;
   int decimals = 2;
-  String resultPlaceHolder = '... ...';
+  final String resultPlaceHolder = '... ...';
   var sessionIsValid = false;
-  String? currentSessionId;
+
+  int? currentSessionId;
 
   final ScrollController _scrollController = ScrollController();
   final ScrollController _resultsController = ScrollController();
@@ -103,17 +106,9 @@ class _CalculatorAppState extends State<CalculatorApp>
         });
         return;
       }
-      final resultId = DateTime.now().toString();
-      print(_resultsController.position.pixels);
-      Provider.of<Results>(context, listen: false).addResult(
-          currentSessionId!,
-          ResultModel(
-              id: resultId,
-              dateStamp: DateTime.now(),
-              expression: _textEditingController.text,
-              result: resultDouble,
-              sessionId: currentSessionId!));
-      print(_resultsController.position.pixels);
+
+      addResult();
+
       setState(() {
         _resultsController.animateTo(
             _resultsController.position.minScrollExtent,
@@ -134,11 +129,21 @@ class _CalculatorAppState extends State<CalculatorApp>
     // endregion
     // region On G pressed
     if (symbol == 'G') {
-      Position position = await Geolocator.getCurrentPosition();
-      List pm =
-          await placemarkFromCoordinates(position.latitude, position.longitude);
-
-      return;
+      updateUI();
+    }
+    // endregion
+    //region on '?' Mark
+    if (symbol == '?') {
+      currentSessionId = await DBHelper.instance.insertSession({
+        DBHelper.sessionName: 'first session',
+        DBHelper.dateStampSession: DateTime.now().toIso8601String(),
+      });
+    }
+    // endregion
+    // region on 'M+' Mark
+    if (symbol == 'M+') {
+      await DBHelper.instance
+          .queryMapOfResultsBySessionIds([currentSessionId!]);
     }
     // endregion
     addSymbolToCursorPosition(symbol);
@@ -149,58 +154,12 @@ class _CalculatorAppState extends State<CalculatorApp>
 
   // endregion
   // region CATCH POSITION
-  Future<Position> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
 
-    // Test if location services are enabled.
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      // Location services are not enabled don't continue
-      // accessing the position and request users of the
-      // App to enable the location services.
-      return Future.error('Location services are disabled.');
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        // Permissions are denied, next time you could try
-        // requesting permissions again (this is also where
-        // Android's shouldShowRequestPermissionRationale
-        // returned true. According to Android guidelines
-        // your App should show an explanatory UI now.
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      // Permissions are denied forever, handle appropriately.
-      await Geolocator.openLocationSettings();
-      return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
-    }
-
-    // When we reach here, permissions are granted and we can
-    // continue accessing the position of the device.
-
-    return await Geolocator.getCurrentPosition();
-  }
-
-  void setCurrentPosition(String sessionId) async {
-    Position position = await Geolocator.getCurrentPosition();
-    List newPlace = await placemarkFromCoordinates(59.267340, 18.011190);
-    Placemark placeMark = newPlace[0];
-
-    String? name = placeMark.name;
-    String? subLocality = placeMark.subLocality;
-    String? locality = placeMark.locality;
-    String? administrativeArea = placeMark.administrativeArea;
-    String? postalCode = placeMark.postalCode;
-    String? country = placeMark.country;
-    String address = "${name}, ${postalCode} ${subLocality}";
-    results.updateSessionName(currentSessionId!, address);
+  void setCurrentPosition(int sessionId) async {
+    BuildContext oldContext = context;
+    String address = await geoLocation.getCurrentPosition();
+    Provider.of<Results>(oldContext, listen: false)
+        .updateSession(currentSessionId!, address, address);
     setState(() {});
   }
   // endregion
@@ -348,6 +307,20 @@ class _CalculatorAppState extends State<CalculatorApp>
   }
   // endregion
 
+  void createSession() async {
+    currentSessionId =
+        await Provider.of<Results>(context, listen: false).createSession();
+    sessionIsValid = true;
+    setCurrentPosition(currentSessionId!);
+  }
+
+  void getHistory() async {
+    if (currentSessionId == null) createSession();
+    sessionIsValid =
+        await Provider.of<Results>(context, listen: false).getHistory();
+    setState(() {});
+  }
+
   // region ResultText Methods
   void onResultTap(String result) {
     addSymbolToCursorPosition(result);
@@ -356,12 +329,6 @@ class _CalculatorAppState extends State<CalculatorApp>
     setState(() {});
   }
 
-  // void onNameTap(String id) {
-  //   // region SHOW DIALOG
-  //   print('nameTapped');
-  //   // endregion
-  // }
-
   // endregion
 
   // region Dialog Function
@@ -369,8 +336,15 @@ class _CalculatorAppState extends State<CalculatorApp>
     setState(() {});
   }
 
-  void _scaleDialog(
-      String currentSessionId, String? expressionId, bool isSession) {
+// region ADD RESULT
+  void addResult() async {
+    Provider.of<Results>(context, listen: false).addResult(
+        _textEditingController.text, resultDouble, currentSessionId!);
+    setState(() {});
+  }
+
+// endregion
+  void _scaleDialog(int currentSessionId, int? expressionId, bool isSession) {
     showGeneralDialog(
       context: context,
       pageBuilder: (ctx, a1, a2) {
@@ -407,13 +381,10 @@ class _CalculatorAppState extends State<CalculatorApp>
 
   @override
   void initState() {
+    geoLocation.determinePosition();
     super.initState();
-    // _resultsController.addListener(() {
-    //   if (_resultsController.position.pixels ==
-    //       _resultsController.position.maxScrollExtent) {
-    //     // reached the end of the list, do something
-    //   }
-    // });
+    getHistory();
+
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -427,16 +398,10 @@ class _CalculatorAppState extends State<CalculatorApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      setState(() {
-        // _resultsController.jumpTo(_resultsController.position.maxScrollExtent);
-      });
-      // App is in the foreground
-      // Set the boolean value to true
     } else if (state == AppLifecycleState.paused) {
-      // App is in the background
-      // Set a timer to reverse the boolean value after 15 minutes
-      Timer(Duration(seconds: 1), () {
+      Timer(const Duration(seconds: 10), () {
         sessionIsValid = false;
+        currentSessionId = null;
 
         // Reverse the boolean value
       });
@@ -451,18 +416,12 @@ class _CalculatorAppState extends State<CalculatorApp>
         Provider.of<SettingsProvider>(context, listen: true).providerTheme;
     bool isLightTheme =
         Provider.of<SettingsProvider>(context, listen: true).isLightTheme;
-    results = Provider.of<Results>(context, listen: true);
-    Map<String, List<ResultModel>> calcResults = results.expressions;
-    List<SessionModel> sessionModels = results.sessionModels;
+
+    _listOfSessions = Provider.of<Results>(context, listen: true).sessionModels;
+    _resultsBySessionId = Provider.of<Results>(context, listen: true).results;
+
     decimals = Provider.of<SettingsProvider>(context, listen: true).decimals;
 
-    if (!sessionIsValid) {
-      currentSessionId = results.createSession();
-      if (currentSessionId != null) {
-        setCurrentPosition(currentSessionId!);
-      }
-      sessionIsValid = true;
-    }
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: PreferredSize(
@@ -472,7 +431,7 @@ class _CalculatorAppState extends State<CalculatorApp>
               constraints: const BoxConstraints(maxWidth: 200),
               child: AnimatedTextKit(
                 key: ValueKey<bool>(isLightTheme),
-                pause: Duration(milliseconds: 1000),
+                pause: const Duration(milliseconds: 1000),
                 totalRepeatCount: 1,
                 animatedTexts: [
                   RotateAnimatedText(
@@ -485,7 +444,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                 ],
               )),
           leading: Container(
-            margin: EdgeInsets.all(0),
+            margin: const EdgeInsets.all(0),
             child: IconButton(
               icon: Icon(
                 Icons.settings,
@@ -509,54 +468,72 @@ class _CalculatorAppState extends State<CalculatorApp>
               child: ListView(shrinkWrap: true, reverse: true, children: [
                 ListView.builder(
                   controller: _resultsController,
-                  itemCount: sessionModels.length,
+                  itemCount: _listOfSessions.length,
                   reverse: true,
                   shrinkWrap: true,
-                  physics: ScrollPhysics(),
+                  physics: const ScrollPhysics(),
                   itemBuilder: (BuildContext context, int sessionIndex) {
-                    var sessionId = sessionModels[sessionIndex].id;
+                    int sessionId = _listOfSessions[sessionIndex].id;
 
                     return Column(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                _scaleDialog(sessionId, null, true);
-                              },
-                              child: SizedBox(
-                                width: (widthOfScreen - 30) * 0.60,
-                                child: FittedBox(
-                                  fit: BoxFit.fill,
-                                  child: Text(
-                                    '${sessionModels[sessionIndex].sessionName}',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: theme.historyText,
-                                        fontFamily: 'ShareTech'),
+                        !sessionIsValid
+                            ? Column(
+                                children: [
+                                  const Text('Loading history...'),
+                                  const SizedBox(
+                                    height: 10,
                                   ),
-                                ),
+                                  CircularProgressIndicator(
+                                    color: theme.equalButton,
+                                  ),
+                                  const SizedBox(
+                                    height: 40,
+                                  )
+                                ],
+                              )
+                            : Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      _scaleDialog(sessionId, null, true);
+                                    },
+                                    child: SizedBox(
+                                      height: 15,
+                                      child: FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          '${_listOfSessions[sessionIndex].sessionName}',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: theme.historyText,
+                                              fontFamily: 'ShareTech'),
+                                          textAlign: TextAlign.left,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    height: 15,
+                                    child: FittedBox(
+                                      fit: BoxFit.fill,
+                                      child: Text(
+                                        DateFormat('yyyy/MM/dd HH:mm')
+                                            .format(
+                                                _listOfSessions[sessionIndex]
+                                                    .dateStamp)
+                                            .toString(),
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: theme.historyText,
+                                            fontFamily: 'ShareTech'),
+                                      ),
+                                    ),
+                                  )
+                                ],
                               ),
-                            ),
-                            SizedBox(
-                              width: (widthOfScreen - 30) * 0.30,
-                              child: FittedBox(
-                                fit: BoxFit.fill,
-                                child: Text(
-                                  DateFormat('yyyy/MM/dd HH:mm')
-                                      .format(
-                                          sessionModels[sessionIndex].dateStamp)
-                                      .toString(),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: theme.historyText,
-                                      fontFamily: 'ShareTech'),
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
                         const Divider(
                           height: 1,
                           thickness: 2,
@@ -569,23 +546,21 @@ class _CalculatorAppState extends State<CalculatorApp>
                               padding: const EdgeInsets.only(bottom: 10),
                               reverse: true,
                               itemCount:
-                                  sessionModels[sessionIndex].resultsId.length,
+                                  _resultsBySessionId[sessionId]?.length ?? 0,
                               itemBuilder: (context, index) {
-                                var i = sessionModels[sessionIndex]
-                                        .resultsId
-                                        .length -
+                                var i = _resultsBySessionId[sessionId]!.length -
                                     index -
                                     1;
-                                List<ResultModel> currentResult =
-                                    calcResults[sessionId]!.toList();
+                                List<ResultModel> results =
+                                    _resultsBySessionId[sessionId] ?? [];
                                 return ResultTile(
                                   sessionId: sessionId,
-                                  expressionId: currentResult[i].id,
-                                  name: currentResult[i].name == null
+                                  expressionId: results[i].id,
+                                  name: results[i].name == null
                                       ? '...'
-                                      : currentResult[i].name!,
-                                  expression: currentResult[i].expression ?? '',
-                                  result: currentResult[i]
+                                      : results[i].name!,
+                                  expression: results[i].expression ?? '',
+                                  result: results[i]
                                           .result
                                           .toStringAsFixed(decimals) ??
                                       '',
@@ -593,7 +568,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                                   backgroundColor: theme.background,
                                   resultTextColor: theme.historyText,
                                   onResultTap: onResultTap,
-                                  nameTextColor: currentResult[i].name == null
+                                  nameTextColor: results[i].name == null
                                       ? theme.resultText
                                       : null,
                                   onNameTap: _scaleDialog,
@@ -730,7 +705,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                             color: theme.operationButton,
                             borderRadius: BorderRadius.circular(20)),
                         duration: const Duration(milliseconds: 100),
-                        child: Center(child: Text('<>')),
+                        child: const Center(child: Text('<>')),
                       ),
                     ),
                     ControlBarButton(
@@ -910,7 +885,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                           textColor: theme.resultText),
                     ],
                   ),
-                  SizedBox(
+                  const SizedBox(
                     height: 30,
                   )
                 ],
@@ -927,5 +902,4 @@ class _CalculatorAppState extends State<CalculatorApp>
   ///
   /// When the location services are not enabled or permissions
   /// are denied the `Future` will return an error.
-
 }

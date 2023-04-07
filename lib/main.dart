@@ -1,5 +1,5 @@
 import 'package:calculator_app/Screens/settings_screen.dart';
-import 'package:calculator_app/models/result_model.dart';
+import 'package:calculator_app/models/models.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../models/result_model.dart';
+import '../models/models.dart';
 import '../models/settings_provider.dart';
 import 'dialog_screen_tile.dart';
 
 class RenameDialog extends StatelessWidget {
-  BuildContext context;
-  bool isSession;
-  String currentSessionId;
-  String? expressionId;
-  VoidCallback callback;
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
+  final BuildContext context;
+  final bool isSession;
+  final int currentSessionId;
+  final int? expressionId;
+  final VoidCallback callback;
   RenameDialog(
       {required this.context,
       required this.isSession,
@@ -27,10 +29,7 @@ class RenameDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     ResultModel? resultModel;
-    final TextEditingController nameControllerTextField =
-        TextEditingController();
-    final TextEditingController noteControllerTextField =
-        TextEditingController();
+
     final theme =
         Provider.of<SettingsProvider>(context, listen: false).providerTheme;
 
@@ -40,7 +39,9 @@ class RenameDialog extends StatelessWidget {
       resultModel = Provider.of<Results>(context, listen: false)
           .fetchResultModelById(currentSessionId, expressionId!);
     }
-
+    if (resultModel?.note != null) {
+      noteController.text = resultModel!.note!;
+    }
     return isSession
         ? Dialog(
             backgroundColor: theme.background,
@@ -66,7 +67,7 @@ class RenameDialog extends StatelessWidget {
                             .toString(),
                       ),
                       CustomTextField(
-                          textController: nameControllerTextField,
+                          textController: nameController,
                           hintText: sessionModel.sessionName!),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -97,8 +98,8 @@ class RenameDialog extends StatelessWidget {
                               ),
                               onPressed: () {
                                 Provider.of<Results>(context, listen: false)
-                                    .updateSessionName(currentSessionId,
-                                        nameControllerTextField.text);
+                                    .updateSession(currentSessionId,
+                                        nameController.text, null);
                                 callback();
                                 Navigator.pop(context);
                               },
@@ -138,7 +139,7 @@ class RenameDialog extends StatelessWidget {
                         value: 'Lillhagsvägen 8, 124 71 Bandhagen',
                       ),
                       CustomTextField(
-                          textController: nameControllerTextField,
+                          textController: nameController,
                           hintText: resultModel.name == null
                               ? 'type a name'
                               : resultModel.name!),
@@ -168,7 +169,7 @@ class RenameDialog extends StatelessWidget {
                             child: TextField(
                               style: TextStyle(color: theme.resultText),
                               maxLines: 3,
-                              controller: noteControllerTextField,
+                              controller: noteController,
                               decoration: InputDecoration(
                                   hintStyle: TextStyle(
                                       color: resultModel.note == null
@@ -192,7 +193,7 @@ class RenameDialog extends StatelessWidget {
                               icon: const Icon(Icons.clear),
                               color: theme.historyText,
                               onPressed: () {
-                                noteControllerTextField.text = '';
+                                noteController.text = '';
                               },
                             ),
                           ),
@@ -226,24 +227,29 @@ class RenameDialog extends StatelessWidget {
                                     theme.operationButton, // foreground
                               ),
                               onPressed: () {
-                                if (nameControllerTextField.text.isNotEmpty &&
-                                    nameControllerTextField.text !=
-                                        'type a name') {
-                                  Provider.of<Results>(context, listen: false)
-                                      .changeExpressionNameById(
-                                          currentSessionId,
-                                          resultModel!.id,
-                                          nameControllerTextField.text);
+                                String name = '';
+                                String? note = '';
+
+                                // if (nameController.text != name &&
+                                //     name != '...') {
+                                //   nameController.text.isEmpty
+                                //       ? name = '...'
+                                //       : name = nameController.text;
+                                // }
+                                if (nameController.text.isNotEmpty &&
+                                    nameController.text != 'type a name') {
+                                  name = nameController.text;
+                                } else {
+                                  name = '...';
                                 }
-                                if (noteControllerTextField.text.isNotEmpty) {
-                                  if (noteControllerTextField.text.isNotEmpty) {
-                                    Provider.of<Results>(context, listen: false)
-                                        .changeNoteById(
-                                            currentSessionId,
-                                            resultModel!.id,
-                                            noteControllerTextField.text);
-                                  }
+
+                                if (noteController.text.isNotEmpty) {
+                                  note = noteController.text;
                                 }
+                                Provider.of<Results>(context, listen: false)
+                                    .updateResult(currentSessionId,
+                                        resultModel!.id, name, note);
+
                                 callback();
                                 Navigator.pop(context);
                               },
@@ -262,8 +268,8 @@ class RenameDialog extends StatelessWidget {
 }
 
 class CustomTextField extends StatefulWidget {
-  TextEditingController textController;
-  String hintText;
+  final TextEditingController textController;
+  final String hintText;
 
   CustomTextField({required this.textController, required this.hintText});
 
