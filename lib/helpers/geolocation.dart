@@ -34,19 +34,18 @@ class GeoLocation {
         desiredAccuracy: LocationAccuracy.high);
   }
 
-  Future<String> getCurrentPosition() async {
+  Future<Map<String, dynamic>> getCurrentPosition() async {
+    Map<String, dynamic> geoData = {};
     Position position = await Geolocator.getCurrentPosition();
-    List newPlace = await placemarkFromCoordinates(59.267340, 18.011190);
+    List newPlace =
+        await placemarkFromCoordinates(position.latitude, position.longitude);
     Placemark placeMark = newPlace[0];
+    String address =
+        "${placeMark.name}, ${placeMark.postalCode} ${placeMark.subLocality}";
+    geoData['address'] = address;
+    geoData['latitude'] = position.latitude;
+    geoData['longitude'] = position.longitude;
 
-    String? name = placeMark.name;
-    String? subLocality = placeMark.subLocality;
-    String? locality = placeMark.locality;
-    String? administrativeArea = placeMark.administrativeArea;
-    String? postalCode = placeMark.postalCode;
-    String? country = placeMark.country;
-    String address = "${name}, ${postalCode} ${subLocality}";
-
-    return address;
+    return geoData;
   }
 }

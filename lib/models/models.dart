@@ -55,7 +55,7 @@ class Results extends ChangeNotifier {
   Future<bool> getHistory() async {
     _listOfSessions.clear();
     _listOfSessions = await DBHelper.instance.queryAllSessions() ?? [];
-    print(_listOfSessions.length);
+
     List<int> sessionIds = [];
     _listOfSessions.forEach((element) {
       sessionIds.add(element.id);
@@ -66,39 +66,63 @@ class Results extends ChangeNotifier {
   }
 
   Future<int?> createSession() async {
-    int? currentSessionId = await DBHelper.instance.insertSession({
-      DBHelper.sessionName: '...',
-      DBHelper.dateStampSession: DateTime.now().toIso8601String(),
-      DBHelper.address: '',
-    });
-    if (currentSessionId != null) {
-      return currentSessionId;
+    int? lastSessionIdIfEmpty = await DBHelper.instance.isLastSessionEmpty();
+    print(lastSessionIdIfEmpty);
+    String? address = '...';
+    String? name = '...';
+    DateTime dateStamp = DateTime.now();
+    if (lastSessionIdIfEmpty != null) {
+      updateSession(lastSessionIdIfEmpty, null, address, name, null, null);
+      return lastSessionIdIfEmpty;
+    } else {
+      int? sessionId = await DBHelper.instance.insertSession({
+        DBHelper.sessionName: name,
+        DBHelper.address: address,
+        DBHelper.dateStampSession: dateStamp.toIso8601String()
+      });
+      if (sessionId != null) {
+        _listOfSessions.insert(
+            0,
+            SessionModel(
+                id: sessionId,
+                dateStamp: dateStamp,
+                sessionName: name,
+                address: address));
+        return sessionId;
+      }
     }
     return null;
   }
 
-  void updateSession(int sessionId, String sessionName, String? address) async {
-    print('success');
+  void updateSession(int sessionId, DateTime? dateStamp, String sessionName,
+      String? address, double? latitude, double? longitude) async {
+    dateStamp ??= DateTime.now();
+
     final index =
         _listOfSessions.indexWhere((element) => element.id == sessionId);
     address ??= _listOfSessions[index].address;
     if (index != -1) {
       _listOfSessions[index].sessionName = sessionName;
       _listOfSessions[index].address = address;
-      DBHelper.instance.updateSession(sessionId, sessionName, address);
+      _listOfSessions[index].latitude = latitude;
+      _listOfSessions[index].longitude = longitude;
+      DBHelper.instance.updateSession(sessionId, dateStamp.toIso8601String(),
+          sessionName, address, latitude, longitude);
       notifyListeners();
     }
   }
 
-  void addResult(
+  Future<bool> addResult(
     String expression,
     double resultOfExp,
+    String? address,
     int sessionId,
   ) async {
-    DateTime dateNow = DateTime.now();
+    DateTime dateStamp = DateTime.now();
 
     int? newResultId = await DBHelper.instance.insertResult({
-      DBHelper.dateStampResult: dateNow.toIso8601String(),
+      DBHelper.dateStampResult: dateStamp.toIso8601String(),
+      DBHelper.address: address,
       DBHelper.expression: expression,
       DBHelper.result: resultOfExp,
       DBHelper.sessionId: sessionId
@@ -106,34 +130,58 @@ class Results extends ChangeNotifier {
     if (newResultId != null) {
       ResultModel result = ResultModel(
           id: newResultId,
+          address: address,
           expression: expression,
           result: resultOfExp,
-          dateStamp: dateNow,
+          dateStamp: dateStamp,
           sessionId: sessionId);
 
-      List<ResultModel>? results = _resultsBySessionId[sessionId];
-      results?.add(result);
+      List<ResultModel>? results = _resultsBySessionId[sessionId] ?? [];
+      results.add(result);
+
       _resultsBySessionId[sessionId] = results;
     }
     notifyListeners();
+    return true;
   }
 
   List<ResultModel> getResultsModelsBySessionId(String sessionId) {
     return results[sessionId]!;
   }
 
-  void updateResult(
-      int sessionId, int resultId, String resultName, String? note) async {
-    print('sended note: $note');
+  void updateResult(int sessionId, int resultId, String resultName,
+      String? address, String? note) async {
     results[sessionId]?.forEach((element) {
       if (element.id == resultId) {
         element.name = resultName;
         note == null ? note = element.note : element.note = note;
-        print('note models: $note');
+        address == null ? address = element.address : element.address = address;
       }
     });
-    DBHelper.instance.updateResult(resultId, resultName, note);
+    DBHelper.instance.updateResult(resultId, resultName, address, note);
     notifyListeners();
+  }
+
+  void updateAddressesOnResults(int sessionId, String address) async {
+    Map<int, List<ResultModel>> mapOfResults =
+        await DBHelper.instance.queryMapOfResultsBySessionIds([sessionId]);
+    if (mapOfResults != null) {
+      List<ResultModel> listOfResults = mapOfResults[sessionId]!;
+      List<ResultModel> newListOfResults = [];
+      for (var result in listOfResults) {
+        await DBHelper.instance
+            .updateResult(result.id, result.name!, address, result.note);
+        newListOfResults.add(ResultModel(
+            id: result.id,
+            expression: result.expression,
+            result: result.result,
+            dateStamp: result.dateStamp,
+            sessionId: result.sessionId,
+            address: result.address));
+      }
+      mapOfResults[sessionId] = newListOfResults;
+      notifyListeners();
+    }
   }
 
   ResultModel? fetchResultModelById(int sessionId, int id) {
@@ -151,6 +199,10 @@ class Results extends ChangeNotifier {
   }
 
   SessionModel fetchSessionModelById(id) {
+    print(id);
+    id = 4;
+    print(_listOfSessions.length);
+
     return _listOfSessions.firstWhere((element) => element.id == id);
   }
 }

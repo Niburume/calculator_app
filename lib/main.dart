@@ -1,3 +1,4 @@
+import 'package:calculator_app/Screens/search_screen.dart';
 import 'package:calculator_app/Screens/settings_screen.dart';
 import 'package:calculator_app/models/models.dart';
 import 'package:flutter/material.dart';
@@ -39,6 +40,7 @@ void main() {
             // AddPlaceScreen.routeName: (ctx) => AddPlaceScreen(),
 
             SettingsScreen.routeName: (context) => SettingsScreen(),
+            SearchScreen.routeName: (context) => SearchScreen(),
           },
         );
       }),

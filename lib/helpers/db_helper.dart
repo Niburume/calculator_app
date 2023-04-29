@@ -20,6 +20,8 @@ class DBHelper {
   static const sessionName = 'sessionName';
   static const dateStampSession = 'dateStamp';
   static const address = 'address';
+  static const latitude = 'latitude';
+  static const longitude = 'longitude';
 
   // results
   static const columnResultId = 'id';
@@ -56,7 +58,9 @@ class DBHelper {
       $columnSessionId INTEGER PRIMARY KEY,
       $sessionName TEXT NOT NULL,
       $dateStampSession TEXT NOT NULL,
-      $address TEXT
+      $address TEXT,
+      $latitude REAL,
+      $longitude REAL
       )
       
        ''');
@@ -66,6 +70,7 @@ class DBHelper {
     $resultName TEXT,
     $expression TEXT NOT NULL,
     $result REAL NOT NULL,
+    $address TEXT,
     $dateStampResult TEXT NOT NULL,
     $sessionId INTEGER,
     $note TEXT,
@@ -86,28 +91,55 @@ class DBHelper {
     return null;
   }
 
+  Future<int?> isLastSessionEmpty() async {
+    Database? db = await instance.database;
+    int? sessionId;
+    if (db != null) {
+      List<Map<String, dynamic>> session = await db.rawQuery(
+          'SELECT * FROM $_sessionTable ORDER BY $columnSessionId DESC LIMIT 1');
+      if (session.isEmpty) return null;
+      if (session.isNotEmpty) {
+        sessionId = session.first['id'] as int?;
+      }
+
+      var listOfResults = await db.rawQuery(
+        'SELECT * FROM $_resultTable WHERE sessionId = ?',
+        [sessionId],
+      );
+      if (listOfResults.isEmpty) {
+        return sessionId;
+      }
+    }
+    return null;
+  }
+
   Future<List<SessionModel>?> queryAllSessions() async {
     List<SessionModel> _listOfSessions = [];
     Database? db = await instance.database;
     if (db != null) {
       var sessions = await db.query(_sessionTable);
+      // try to query results if null, delete
+
       for (var sessionRow in sessions) {
         int sessionId = sessionRow[DBHelper.columnSessionId] as int;
         String sessionName = sessionRow[DBHelper.sessionName] as String;
         String dateStampSession =
             sessionRow[DBHelper.dateStampSession] as String;
         String address = sessionRow[DBHelper.address] as String;
+        double? latitude = sessionRow[DBHelper.latitude] as double?;
+        double? longitude = sessionRow[DBHelper.longitude] as double?;
         SessionModel session = SessionModel(
             id: sessionId,
             sessionName: sessionName,
             dateStamp: DateTime.parse(dateStampSession),
-            address: address);
+            address: address,
+            latitude: latitude,
+            longitude: longitude);
         _listOfSessions.add(session);
       }
       return _listOfSessions.reversed.toList();
     }
     return null;
-    // Do something with the lists here, e.g. update state or call a callback function
   }
 
   Future<Map<int, List<ResultModel>>> queryMapOfResultsBySessionIds(
@@ -144,36 +176,53 @@ class DBHelper {
               sessionId: sessionId);
           resultList.add(result);
         }
+        // if (resultList.isEmpty) {
+        //   continue;
+        // }
         results[sessionId] = resultList;
       }
     }
     return results;
   }
 
-  Future<int?> updateSession(
-      int id, String sessionName, String? address) async {
+  Future<int?> updateSession(int id, String dateStamp, String? sessionName,
+      String? address, double? latitude, double? longitude) async {
     Database? db = await instance.database;
     if (db != null) {
-      return await db.update(_sessionTable,
-          {DBHelper.sessionName: sessionName, DBHelper.address: address},
-          where: '$columnSessionId = ?', whereArgs: [id]);
+      return await db.update(
+          _sessionTable,
+          {
+            DBHelper.dateStampSession: dateStamp,
+            DBHelper.sessionName: sessionName,
+            DBHelper.address: address,
+            DBHelper.latitude: latitude,
+            DBHelper.longitude: longitude
+          },
+          where: '$columnSessionId = ?',
+          whereArgs: [id]);
     }
     return null;
   }
 
-  Future<int?> updateResult(
-      int resultId, String resultName, String? resultNote) async {
+  Future<int?> updateResult(int resultId, String resultName, String? address,
+      String? resultNote) async {
     Database? db = await instance.database;
-    print(resultName);
+
     if (db != null) {
-      return await db.update(_resultTable,
-          {DBHelper.resultName: resultName, DBHelper.note: resultNote},
-          where: '$columnResultId = ?', whereArgs: [resultId]);
+      return await db.update(
+          _resultTable,
+          {
+            DBHelper.resultName: resultName,
+            DBHelper.note: resultNote,
+            DBHelper.address: address
+          },
+          where: '$columnResultId = ?',
+          whereArgs: [resultId]);
     }
     return null;
   }
 
-  Future<int?> delete(int id) async {
+  Future<int?> deleteSession(int id) async {
     Database? db = await instance.database;
     if (db != null) {
       return await db.delete(_sessionTable,

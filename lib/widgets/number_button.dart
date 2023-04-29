@@ -25,17 +25,17 @@ class CalcButton extends StatelessWidget {
           onPressed(symbol);
         },
         child: Container(
-          margin: EdgeInsets.all(5),
+          margin: EdgeInsets.all(2),
           width: buttonSize * 0.9,
           height: buttonSize * 0.6,
           decoration: BoxDecoration(
             color: buttonColor,
-            shape: BoxShape.circle,
+            shape: BoxShape.rectangle,
             boxShadow: [
               BoxShadow(
                 color: buttonColor,
                 offset: Offset(2, 2),
-                blurRadius: 10.0,
+                blurRadius: 5.0,
               ),
             ],
           ),

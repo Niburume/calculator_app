@@ -98,8 +98,13 @@ class RenameDialog extends StatelessWidget {
                               ),
                               onPressed: () {
                                 Provider.of<Results>(context, listen: false)
-                                    .updateSession(currentSessionId,
-                                        nameController.text, null);
+                                    .updateSession(
+                                        currentSessionId,
+                                        sessionModel.dateStamp,
+                                        nameController.text,
+                                        null,
+                                        null,
+                                        null);
                                 callback();
                                 Navigator.pop(context);
                               },
@@ -248,7 +253,7 @@ class RenameDialog extends StatelessWidget {
                                 }
                                 Provider.of<Results>(context, listen: false)
                                     .updateResult(currentSessionId,
-                                        resultModel!.id, name, note);
+                                        resultModel!.id, name, null, note);
 
                                 callback();
                                 Navigator.pop(context);

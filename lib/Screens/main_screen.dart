@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:calculator_app/Screens/search_screen.dart';
 import 'package:calculator_app/Screens/settings_screen.dart';
 import 'package:calculator_app/helpers/db_helper.dart';
 import 'package:calculator_app/widgets/controlBarButton.dart';
 import 'package:calculator_app/widgets/number_button.dart';
 import 'package:flutter/material.dart';
 import 'package:function_tree/function_tree.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -157,9 +159,16 @@ class _CalculatorAppState extends State<CalculatorApp>
 
   void setCurrentPosition(int sessionId) async {
     BuildContext oldContext = context;
-    String address = await geoLocation.getCurrentPosition();
-    Provider.of<Results>(oldContext, listen: false)
-        .updateSession(currentSessionId!, address, address);
+    Map<String, dynamic> geoData = await geoLocation.getCurrentPosition();
+
+    Provider.of<Results>(oldContext, listen: false).updateSession(
+        currentSessionId!,
+        null,
+        geoData['address'],
+        geoData['address'],
+        geoData['latitude'],
+        geoData['longitude']);
+
     setState(() {});
   }
   // endregion
@@ -307,18 +316,22 @@ class _CalculatorAppState extends State<CalculatorApp>
   }
   // endregion
 
-  void createSession() async {
-    currentSessionId =
+  Future<int?> createSession() async {
+    int? currentId =
         await Provider.of<Results>(context, listen: false).createSession();
-    sessionIsValid = true;
-    setCurrentPosition(currentSessionId!);
+    setCurrentPosition(currentId!);
+    return currentId;
   }
 
   void getHistory() async {
-    if (currentSessionId == null) createSession();
-    sessionIsValid =
+    bool historyIsLoaded =
         await Provider.of<Results>(context, listen: false).getHistory();
-    setState(() {});
+    if (historyIsLoaded) {
+      int? currentId = await createSession();
+      sessionIsValid = true;
+      currentSessionId = currentId;
+      setState(() {});
+    }
   }
 
   // region ResultText Methods
@@ -338,9 +351,14 @@ class _CalculatorAppState extends State<CalculatorApp>
 
 // region ADD RESULT
   void addResult() async {
-    Provider.of<Results>(context, listen: false).addResult(
-        _textEditingController.text, resultDouble, currentSessionId!);
-    setState(() {});
+    String? address;
+    SessionModel currentSession =
+        _listOfSessions.firstWhere((element) => element.id == currentSessionId);
+    if (currentSession.address != null) address = currentSession.address;
+    await Provider.of<Results>(context, listen: false)
+        .addResult(_textEditingController.text, resultDouble, address,
+            currentSessionId!)
+        .then((value) => setState(() {}));
   }
 
 // endregion
@@ -376,6 +394,7 @@ class _CalculatorAppState extends State<CalculatorApp>
       buttonSize = (widthOfScreen - 15 * 2) / 4;
       textFieldFontSize = buttonSize / 2.5;
     });
+
     super.didChangeDependencies();
   }
 
@@ -383,8 +402,8 @@ class _CalculatorAppState extends State<CalculatorApp>
   void initState() {
     geoLocation.determinePosition();
     super.initState();
+    sessionIsValid = false;
     getHistory();
-
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -398,11 +417,15 @@ class _CalculatorAppState extends State<CalculatorApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      if (!sessionIsValid) {
+        print('resumed');
+        getHistory();
+      }
     } else if (state == AppLifecycleState.paused) {
-      Timer(const Duration(seconds: 10), () {
+      Timer(const Duration(minutes: 60), () {
         sessionIsValid = false;
         currentSessionId = null;
-
+        print('paused');
         // Reverse the boolean value
       });
     }
@@ -456,6 +479,13 @@ class _CalculatorAppState extends State<CalculatorApp>
               },
             ),
           ),
+          actions: [
+            IconButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, SearchScreen.routeName);
+                },
+                icon: const Icon(Icons.search))
+          ],
         ),
       ),
       backgroundColor: theme.background,
@@ -505,7 +535,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                                       child: FittedBox(
                                         fit: BoxFit.scaleDown,
                                         child: Text(
-                                          '${_listOfSessions[sessionIndex].sessionName}',
+                                          '${_listOfSessions[sessionIndex].sessionName} $sessionIndex',
                                           style: TextStyle(
                                               fontSize: 12,
                                               color: theme.historyText,
@@ -724,14 +754,6 @@ class _CalculatorAppState extends State<CalculatorApp>
                       isWheelSelected: wheelIsSelected,
                       onPressed: buttonPressed,
                     ),
-                    ControlBarButton(
-                      buttonSize: !wheelIsSelected ? buttonSize : 0,
-                      buttonColor: theme.operationButton,
-                      textColor: theme.resultText,
-                      symbol: '\u{232B}',
-                      isWheelSelected: wheelIsSelected,
-                      onPressed: buttonPressed,
-                    ),
                   ],
                 )),
             // endregion
@@ -873,7 +895,7 @@ class _CalculatorAppState extends State<CalculatorApp>
                           textColor: theme.resultText),
                       CalcButton(
                           buttonSize: buttonSize,
-                          symbol: "?",
+                          symbol: "\u{232B}",
                           onPressed: buttonPressed,
                           buttonColor: theme.numberButton,
                           textColor: theme.resultText),
